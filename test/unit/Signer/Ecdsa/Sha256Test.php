@@ -8,7 +8,7 @@ namespace Lcobucci\JWT\Signer\Ecdsa;
  * @author Luís Otávio Cobucci Oblonczyk <lcobucci@gmail.com>
  * @since 2.1.0
  */
-final class Sha256Test extends BaseTestCase
+final class Sha256Test extends \PHPUnit\Framework\TestCase
 {
     /**
      * @test
@@ -51,6 +51,6 @@ final class Sha256Test extends BaseTestCase
 
     private function getSigner(): Sha256
     {
-        return new Sha256($this->adapter, $this->keyParser);
+        return new Sha256();
     }
 }

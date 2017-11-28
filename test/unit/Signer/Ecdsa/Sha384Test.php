@@ -8,7 +8,7 @@ namespace Lcobucci\JWT\Signer\Ecdsa;
  * @author Luís Otávio Cobucci Oblonczyk <lcobucci@gmail.com>
  * @since 2.1.0
  */
-final class Sha384Test extends BaseTestCase
+final class Sha384Test extends \PHPUnit\Framework\TestCase
 {
     /**
      * @test
@@ -51,6 +51,6 @@ final class Sha384Test extends BaseTestCase
 
     private function getSigner(): Sha384
     {
-        return new Sha384($this->adapter, $this->keyParser);
+        return new Sha384();
     }
 }

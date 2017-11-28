@@ -232,7 +232,7 @@ class EcdsaTokenTest extends \PHPUnit\Framework\TestCase
     /**
      * @test
      *
-     * @expectedException \RuntimeException
+     * @expectedException \InvalidArgumentException
      *
      * @expectedException \Lcobucci\JWT\Validation\InvalidTokenException
      *

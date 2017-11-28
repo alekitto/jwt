@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Lcobucci\JWT\Signer;
 
-use Lcobucci\JWT\Signer\Ecdsa\BaseTestCase;
+use Lcobucci\JWT\Keys;
 use Mdanter\Ecc\Crypto\Key\PrivateKeyInterface;
 use Mdanter\Ecc\Crypto\Key\PublicKeyInterface;
 
@@ -12,17 +12,16 @@ use Mdanter\Ecc\Crypto\Key\PublicKeyInterface;
  * @author Luís Otávio Cobucci Oblonczyk <lcobucci@gmail.com>
  * @since 2.1.0
  */
-final class EcdsaTest extends BaseTestCase
+final class EcdsaTest extends \PHPUnit\Framework\TestCase
 {
+    use Keys;
+
     /**
      * @return Ecdsa
      */
     private function getSigner(): Ecdsa
     {
-        $signer = $this->getMockForAbstractClass(
-            Ecdsa::class,
-            [$this->adapter, $this->keyParser]
-        );
+        $signer = $this->getMockForAbstractClass(Ecdsa::class);
 
         $signer->method('getAlgorithm')
                ->willReturn('sha256');
@@ -36,18 +35,6 @@ final class EcdsaTest extends BaseTestCase
     /**
      * @test
      *
-     * @covers \Lcobucci\JWT\Signer\Ecdsa::__construct
-     */
-    public function constructShouldConfigureDependencies(): void
-    {
-        $signer = $this->getSigner();
-
-        self::assertAttributeSame($this->adapter, 'adapter', $signer);
-    }
-
-    /**
-     * @test
-     *
      * @uses \Lcobucci\JWT\Signer\Ecdsa::__construct
      * @uses \Lcobucci\JWT\Signer\Key
      *
@@ -55,25 +42,8 @@ final class EcdsaTest extends BaseTestCase
      */
     public function signShouldReturnAHashUsingPrivateKey(): void
     {
-        $signer      = $this->getSigner();
-        $key         = new Key('testing');
-        $privateKey  = $this->createMock(PrivateKeyInterface::class);
-        $signingHash = \gmp_init(10, 10);
-
-        $this->keyParser->expects($this->once())
-                      ->method('getPrivateKey')
-                      ->with($key)
-                      ->willReturn($privateKey);
-
-        $this->adapter->expects($this->once())
-                      ->method('createSigningHash')
-                      ->with('testing', 'sha256')
-                      ->willReturn($signingHash);
-
-        $this->adapter->expects($this->once())
-                      ->method('createHash')
-                      ->with($privateKey, $signingHash)
-                      ->willReturn('string');
+        $signer = $this->getSigner();
+        $key    = self::$ecdsaKeys['private'];
 
         self::assertInternalType('string', $signer->sign('testing', $key));
     }
@@ -88,26 +58,14 @@ final class EcdsaTest extends BaseTestCase
      */
     public function verifyShouldDelegateToEcdsaSignerUsingPublicKey(): void
     {
+        $payload    = 'testing';
+        $privateKey = \openssl_get_privatekey(self::$ecdsaKeys['private-params']->getContent());
+        $signature  = '';
+        \openssl_sign($payload, $signature, $privateKey, \OPENSSL_ALGO_SHA256);
+
         $signer      = $this->getSigner();
-        $key         = new Key('testing');
-        $publicKey   = $this->createMock(PublicKeyInterface::class);
-        $signingHash = \gmp_init(10, 10);
+        $key         = self::$ecdsaKeys['public-params'];
 
-        $this->keyParser->expects($this->once())
-                        ->method('getPublicKey')
-                        ->with($key)
-                        ->willReturn($publicKey);
-
-        $this->adapter->expects($this->once())
-                     ->method('createSigningHash')
-                     ->with('testing2', 'sha256')
-                     ->willReturn($signingHash);
-
-        $this->adapter->expects($this->once())
-                      ->method('verifyHash')
-                      ->with('testing', $publicKey, $signingHash)
-                      ->willReturn(true);
-
-        self::assertTrue($signer->verify('testing', 'testing2', $key));
+        self::assertTrue($signer->verify($signature, 'testing', $key));
     }
 }

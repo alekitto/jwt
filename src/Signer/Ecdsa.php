@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Lcobucci\JWT\Signer;
 
 use Lcobucci\JWT\Signer;
-use Lcobucci\JWT\Signer\Ecdsa\EccAdapter;
-use Mdanter\Ecc\EccFactory;
-use Lcobucci\JWT\Signer\Ecdsa\KeyParser;
 
 /**
  * Base class for ECDSA signers
@@ -17,30 +14,9 @@ use Lcobucci\JWT\Signer\Ecdsa\KeyParser;
  */
 abstract class Ecdsa implements Signer
 {
-    /**
-     * @var EccAdapter
-     */
-    private $adapter;
-
-    /**
-     * @var KeyParser
-     */
-    private $keyParser;
-
     public static function create(): Ecdsa
     {
-        $mathInterface = EccFactory::getAdapter();
-
-        return new static(
-            EccAdapter::create($mathInterface),
-            KeyParser::create($mathInterface)
-        );
-    }
-
-    public function __construct(EccAdapter $adapter, KeyParser $keyParser)
-    {
-        $this->adapter   = $adapter;
-        $this->keyParser = $keyParser;
+        return new static();
     }
 
     /**
@@ -48,11 +24,18 @@ abstract class Ecdsa implements Signer
      */
     final public function sign(string $payload, Key $key): string
     {
-        return $this->adapter->createHash(
-            $this->keyParser->getPrivateKey($key),
-            $this->adapter->createSigningHash($payload, $this->getAlgorithm()),
-            $this->getAlgorithm()
-        );
+        $key = \openssl_get_privatekey($key->getContent(), $key->getPassphrase());
+        $this->validateKey($key);
+
+        $signature = '';
+
+        if (! \openssl_sign($payload, $signature, $key, $this->getAlgorithm())) {
+            throw new \InvalidArgumentException(
+                'There was an error while creating the signature: ' . \openssl_error_string()
+            );
+        }
+
+        return $signature;
     }
 
     /**
@@ -60,12 +43,10 @@ abstract class Ecdsa implements Signer
      */
     final public function verify(string $expected, string $payload, Key $key): bool
     {
-        return $this->adapter->verifyHash(
-            $expected,
-            $this->keyParser->getPublicKey($key),
-            $this->adapter->createSigningHash($payload, $this->getAlgorithm()),
-            $this->getAlgorithm()
-        );
+        $key = \openssl_get_publickey($key->getContent());
+        $this->validateKey($key);
+
+        return \openssl_verify($payload, $expected, $key, $this->getAlgorithm()) === 1;
     }
 
     /**
@@ -74,4 +55,26 @@ abstract class Ecdsa implements Signer
      * @return string
      */
     abstract public function getAlgorithm(): string;
+
+    /**
+     * Raise an exception when the key type is not the expected type
+     *
+     * @param resource|bool $key
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function validateKey($key): void
+    {
+        if ($key === false) {
+            throw new \InvalidArgumentException(
+                'It was not possible to parse your key, reason: ' . \openssl_error_string()
+            );
+        }
+
+        $details = \openssl_pkey_get_details($key);
+
+        if (! isset($details['key']) || $details['type'] !== \OPENSSL_KEYTYPE_EC) {
+            throw new \InvalidArgumentException('This key is not compatible with ECDSA signatures');
+        }
+    }
 }
